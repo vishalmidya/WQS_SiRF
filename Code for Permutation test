@@ -1,26 +1,49 @@
 # Permutation test
 
-## 75 training  and whole testing
+M <- 200
+cd_dep_ind <- NA_real_
+tcp_dep_ind <- NA_real_
 
-train.id <- sample(seq(1,n), ceiling(n*75/100))
-test.id <- setdiff(1:n, train.id)
+for(i in 1:M){
+  
+  train.id <- sample(seq(1,n), ceiling(n*75/100))
+  
+  permdata <- finaldf
+  permdata$resid <- sample(permdata$resid)
+  
+  fit <- iRF(x=permdata[train.id, exposures], 
+             y=permdata[train.id,"resid"], 
+             xtest=permdata[, exposures],
+             ytest=permdata[,"resid"],
+             n.iter=5, 
+             n.core=5,
+             select.iter = T,
+             n.bootstrap=250
+  )
+  
+  dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.5,])
+  
+  if(nrow(dypt)!=0){
+    
+    dypt$synergy <- rep(NA_real_,nrow(dypt))
+    for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
+    d <- dypt[dypt$synergy == 0,]
+    
+    cd_dep_ind <- c(cd_dep_ind, sum(d$int %in% "Cd+_DEP+"))
+    tcp_dep_ind <- c(tcp_dep_ind, sum(d$int %in% "DEP+_TCP246+"))
+    
+  } else if(nrow(dypt)==0){
+    
+    cd_dep_ind <- c(cd_dep_ind, 0)
+    tcp_dep_ind <- c(tcp_dep_ind, 0)
+    
+  }
+  
+}
 
-permdata <- finaldf
-permdata$resid <- sample(permdata$resid)
+cd_dep_ind <- cd_dep_ind[-1]
+tcp_dep_ind <- tcp_dep_ind[-1]
 
-fit <- iRF(x=permdata[train.id, exposures], 
-           y=permdata[train.id,"resid"], 
-           xtest=permdata[, exposures],
-           ytest=permdata[,"resid"],
-           n.iter=5, 
-           n.core=1,
-           select.iter = T,
-           n.bootstrap=250
-)
-
-dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.5,])
-dypt$synergy <- rep(NA_real_,nrow(dypt))
-for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
-(d <- dypt[dypt$synergy == 0,])
-
+sum(cd_dep_ind)/M
+sum(tcp_dep_ind)/M
 
