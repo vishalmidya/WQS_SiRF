@@ -1,0 +1,26 @@
+# Permutation test
+
+## 75 training  and whole testing
+
+train.id <- sample(seq(1,n), ceiling(n*75/100))
+test.id <- setdiff(1:n, train.id)
+
+permdata <- finaldf
+permdata$resid <- sample(permdata$resid)
+
+fit <- iRF(x=permdata[train.id, exposures], 
+           y=permdata[train.id,"resid"], 
+           xtest=permdata[, exposures],
+           ytest=permdata[,"resid"],
+           n.iter=5, 
+           n.core=1,
+           select.iter = T,
+           n.bootstrap=250
+)
+
+dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.5,])
+dypt$synergy <- rep(NA_real_,nrow(dypt))
+for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
+(d <- dypt[dypt$synergy == 0,])
+
+
