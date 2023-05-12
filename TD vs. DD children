@@ -1,0 +1,339 @@
+library("xgboost")
+library('gWQS')
+library('MASS')
+library("car")
+library("mvtnorm")
+library("dplyr")
+library('doMC')
+library('doParallel')
+library("gbm")
+library("iRF")
+library('mice')
+library('ggplot2')
+
+targetted_data <- read.csv("C:\\Users\\midyav01\\OneDrive - The Mount Sinai Hospital\\MSSM Projects\\SHAP\\charge data\\1461_TARGETED_DATA.csv")
+targetted_data$analyte_code[targetted_data$analyte_code == "TCP24" & targetted_data$LOD == 0.1] <- "TCP245"
+targetted_data$analyte_code[targetted_data$analyte_code == "TCP24" & targetted_data$LOD == 0.02] <- "TCP246"
+targetted_data$CHILD_PID <- as.character(targetted_data$CHILD_PID)
+targetted_data <- targetted_data[!(targetted_data$analyte_code %in% c('NETFOSAA', 'NMFOSAA', 'PFBS', 'PFDA', 'PFDODA', 'PFHPA', 'PFHXA', 'PFHXS', 'PFNA', 'PFOA', 'PFOS',  'PFOSA', 'PFPEA', 'PFUNDA')),]
+table(targetted_data$analyte_code)
+
+targetted_data$cf <- (1.0223 - 1)/(targetted_data$SG_avg - 1)
+for(i in 1:nrow(targetted_data)){
+  if(targetted_data$cf[i] <= 0.5){targetted_data$cf[i] = 0.5}
+  else if (targetted_data$cf[i] >= 2){targetted_data$cf[i] = 2}
+}
+
+for(i in 1:nrow(targetted_data)){
+  if(targetted_data$comment_code[i] == 37){
+    targetted_data$concentration[i] = targetted_data$LOD[i]/2
+  }
+}
+
+targetted_data$sgc_concentration <- targetted_data$cf*targetted_data$concentration
+targetted_data$sgc_log_concentration <- (log(targetted_data$sgc_concentration, 2))
+
+hist(targetted_data$sgc_log_concentration)
+
+
+concen <- reshape(targetted_data[,c("CHILD_PID","analyte_code","sgc_log_concentration","sample_collection_year")], 
+                  idvar = c("CHILD_PID","sample_collection_year"), 
+                  timevar = "analyte_code", direction = "wide")
+
+head(concen)
+hist(concen$sgc_log_concentration.U)
+
+df <- unlist(strsplit(colnames(concen)[c(-1,-2)],"sgc_log_concentration."))
+colnames(concen) <- c("CHILD_PID","sample_collection_year",df[df != ""])
+
+epi <- read.csv("C:\\Users\\midyav01\\OneDrive - The Mount Sinai Hospital\\MSSM Projects\\SHAP\\charge data\\1461_EPI_DATA.csv")
+d <- merge(epi, concen, by = "CHILD_PID")
+df <- d[,colnames(d) %in% c(colnames(concen),"correctsex","YOB","ChildAgeMos","ChildRace_3cat","OwnHome","MMC_4cat","AgeMomYrs","dx2_group")]
+colnames(df)[3] <- "csex"
+colnames(df)[4] <- "crace"
+colnames(df)[5] <- "cage"
+df$cage <- df$cage/12
+df$YOB <- df$YOB - 2000
+
+init = mice(df[!(colnames(df) %in% c("CHILD_PID","dx2_group"))], maxit=0)
+meth = init$method
+predM = init$predictorMatrix
+set.seed(1234)
+imputed = mice(df[!(colnames(df) %in% c("CHILD_PID","dx2_group"))], method="pmm", predictorMatrix=predM, m=3, ntree = 100)
+imputed <- complete(imputed, action = 3) # this is your final imputed dataset
+
+finaldf <- df
+finaldf$crace <- as.character(imputed$crace)
+finaldf$MMC_4cat <- as.character(imputed$MMC_4cat)
+finaldf$OwnHome <- as.character(imputed$OwnHome)
+
+finaldf$DD <- df$dx2_group
+finaldf <- finaldf[finaldf$DD ==5 | finaldf$DD == 3,]
+finaldf$DD <- ifelse(finaldf$DD == 3, 1, 0)
+
+dim(finaldf)
+table(finaldf$DD)
+
+write.csv(finaldf, "C:\\Users\\midyav01\\OneDrive - The Mount Sinai Hospital\\MSSM Projects\\SHAP\\charge data\\finaldfDD.csv", row.names = F )
+
+
+cd /
+cd /sc/arion/work/midyav01/pfas_ncp_charge/
+bsub -J wqs -P acc_damasv01a  -q premium  -n 4 -R rusage[mem=8G] -W 24:00 -o %J.stdout -eo %J.stderr -L /bin/bash
+
+module load gcc/8.3.0 
+module load R/4.1.0
+Rscript chemical_clique_dup.R
+
+
+
+##############################################################################################
+
+minerva.hpc.mssm.edu
+
+
+module load gcc/8.3.0 
+module load R/4.1.0
+R
+
+library("xgboost")
+library('gWQS')
+library('MASS')
+library("car")
+library("mvtnorm")
+library("dplyr")
+library('doMC')
+library('doParallel')
+library("gbm")
+library("iRF")
+library('mice')
+
+
+cl <- makeCluster(16) 
+registerDoParallel(cl)
+
+
+# finaldf <- read.csv("/sc/arion/work/midyav01/simulation_CTS_FH/charge_data/finaldf.csv")
+finaldf <- read.csv("C:\\Users\\midyav01\\OneDrive - The Mount Sinai Hospital\\MSSM Projects\\SHAP\\charge data\\finaldfDD.csv")
+exposures <- colnames(finaldf)[11:72]
+
+start.time <- Sys.time()
+
+gg <- gwqs(DD ~ wqs + csex + crace + cage + YOB + OwnHome + MMC_4cat + AgeMomYrs,
+             mix_name = exposures, data = finaldf, q = 10, signal = "t2",
+             b = 250, rs = T,   n_vars = 12,  validation = 0, 
+             seed = 123123123, 
+             b1_pos = T,  family = "binomial",plan_strategy = "multicore")
+
+end.time <- Sys.time()
+(time.taken <- end.time - start.time)
+
+finaldf$wqs_q_10 <- gg$wqs
+# write.csv(finaldf, "C:\\Users\\midyav01\\OneDrive - The Mount Sinai Hospital\\MSSM Projects\\SHAP\\charge data\\finaldfDD.csv", row.names = F )
+
+
+gg$final_weights
+
+# mix_name  mean_weight
+# MEPB       MEPB 1.863670e-01
+# BPS         BPS 7.491412e-02
+# TCP246   TCP246 5.529759e-02
+# DHB34     DHB34 5.243756e-02
+# MCHPP     MCHPP 4.389035e-02
+# U             U 4.329277e-02
+# MEOHP     MEOHP 4.073109e-02
+# MCPP       MCPP 4.049064e-02
+# PRPB       PRPB 3.599287e-02
+# MCINP     MCINP 3.531030e-02
+# OHMEP     OHMEP 3.355044e-02
+# MEHHP     MEHHP 3.125926e-02
+# BPF         BPF 3.093731e-02
+# BPP         BPP 2.984867e-02
+# Cd           Cd 2.889379e-02
+# MHXP       MHXP 2.730418e-02
+# Tl           Tl 2.608860e-02
+# MECPP     MECPP 2.412182e-02
+# Mo           Mo 2.408953e-02
+# DCP24     DCP24 2.392694e-02
+# BPA         BPA 2.247145e-02
+# DMDP       DMDP 1.570890e-02
+# HB4         HB4 1.265033e-02
+# ETPB       ETPB 1.084114e-02
+# TCP245   TCP245 8.257502e-03
+# BUPB       BUPB 7.126401e-03
+# MCIOP     MCIOP 7.034268e-03
+# OHETP     OHETP 6.131094e-03
+# MIBP       MIBP 5.437819e-03
+# DMP         DMP 5.066311e-03
+# BPAP       BPAP 5.032863e-03
+# MHPP       MHPP 3.231549e-03
+# TCS         TCS 1.026370e-03
+# DETP       DETP 2.257735e-04
+# BZPB       BZPB 2.149669e-04
+# MMP         MMP 2.078551e-04
+# MCMHP     MCMHP 2.055026e-04
+# MBZP       MBZP 2.023527e-04
+# BPB         BPB 1.069233e-04
+# As           As 3.748332e-05
+# DCP25     DCP25 2.465169e-05
+# PCP         PCP 1.030560e-05
+# MEP         MEP 2.637075e-06
+# MPEP       MPEP 1.895004e-07
+# DMTP       DMTP 1.782420e-07
+# MCHP       MCHP 1.237627e-07
+# HEPB       HEPB 7.497050e-08
+# BP8         BP8 2.857262e-08
+# BPZ         BPZ 1.993528e-08
+# BP3         BP3 1.928776e-08
+# BP2         BP2 1.367961e-08
+# MOP         MOP 5.631416e-09
+# MINP       MINP 4.832010e-09
+# DEP         DEP 1.426339e-09
+# DEDP       DEDP 8.921316e-10
+# BP1         BP1 8.322460e-10
+# Be           Be 9.397038e-11
+# OH4BP     OH4BP 6.165215e-11
+# TCC         TCC 5.510826e-11
+# BPAF       BPAF 5.338627e-11
+# MNBP       MNBP 3.803619e-11
+# MIPP       MIPP 3.097928e-11
+
+finaldf$wqs <- gg$wqs
+fit <- glm(DD ~ wqs + csex + crace + cage + YOB + OwnHome + MMC_4cat + AgeMomYrs, data = finaldf, family = "binomial")
+finaldf$resid <-  resid(fit, type="pearson")
+
+########################################################################################################################################################################
+########################################################################################################################################################################
+########################################################################################################################################################################
+
+library("xgboost")
+library('gWQS')
+library('MASS')
+library("car")
+library("mvtnorm")
+library("dplyr")
+library('doMC')
+library('doParallel')
+library("gbm")
+library("iRF")
+library('mice')
+library('ggplot2')
+
+finaldf <- read.csv("/sc/arion/work/midyav01/simulation_CTS_FH/charge_data/finaldfDD.csv")
+# finaldf <- read.csv("C:\\Users\\midyav01\\OneDrive - The Mount Sinai Hospital\\MSSM Projects\\SHAP\\charge data\\finaldfDD.csv")
+finaldf$MMC_4cat <- as.character(finaldf$MMC_4cat)
+finaldf$crace <- as.character(finaldf$crace)
+finaldf$OwnHome <- as.character(finaldf$OwnHome)
+exposures <- colnames(finaldf)[11:72]
+
+fit <- glm(DD ~ wqs_q_10 + csex + crace + cage + YOB + OwnHome + MMC_4cat + AgeMomYrs, data = finaldf, family = "binomial")
+finaldf$resid <-  resid(fit, type="pearson")
+n <- nrow(finaldf)
+
+# 75 training  and 25 testing
+
+set.seed(123456)
+train.id <- sample(seq(1,n), ceiling(n*75/100))
+test.id <- setdiff(1:n, train.id)
+
+table(finaldf[train.id,"DD"])
+table(finaldf[test.id,"DD"])
+
+set.seed(123456)
+fit <- iRF(x=finaldf[train.id, exposures], 
+           y=finaldf[train.id,"resid"], 
+           xtest=finaldf[test.id, exposures],
+           ytest=finaldf[test.id,"resid"],
+           # xtest=finaldf[, exposures], 
+           # ytest=finaldf[,"resid"], 
+           n.iter=10, 
+           n.core=3,
+           select.iter = T,
+           n.bootstrap=250
+)
+
+dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.5,])
+dypt$synergy <- rep(NA_real_,nrow(dypt))
+for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
+(a <- dypt[dypt$synergy == 0,])
+
+# [1] int        prevalence precision  cpe        sta.cpe    fsd
+# [7] sta.fsd    mip        sta.mip    stability  synergy
+# <0 rows> (or 0-length row.names)
+
+
+# 80 training  and 20 testing
+
+set.seed(123456)
+train.id <- sample(seq(1,n), ceiling(n*80/100))
+test.id <- setdiff(1:n, train.id)
+
+table(finaldf[train.id,"DD"])
+table(finaldf[test.id,"DD"])
+
+set.seed(123456)
+fit <- iRF(x=finaldf[train.id, exposures], 
+           y=finaldf[train.id,"resid"], 
+           xtest=finaldf[test.id, exposures],
+           ytest=finaldf[test.id,"resid"],
+           # xtest=finaldf[, exposures], 
+           # ytest=finaldf[,"resid"], 
+           n.iter=10, 
+           n.core=3,
+           select.iter = T,
+           n.bootstrap=250
+)
+
+dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.5,])
+dypt$synergy <- rep(NA_real_,nrow(dypt))
+for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
+(b <- dypt[dypt$synergy == 0,])
+
+# int prevalence precision         cpe sta.cpe        fsd sta.fsd
+# 5 BP3+_MCMHP+ 0.08019963 0.4759951 -0.01326013       0 0.01364038   0.996
+# mip sta.mip stability synergy
+# 5 -0.02542993       0     0.544       0
+
+
+# 70 training  and 30 testing
+
+set.seed(123456)
+train.id <- sample(seq(1,n), ceiling(n*70/100))
+test.id <- setdiff(1:n, train.id)
+
+table(finaldf[train.id,"DD"])
+table(finaldf[test.id,"DD"])
+
+set.seed(123456)
+fit <- iRF(x=finaldf[train.id, exposures], 
+           y=finaldf[train.id,"resid"], 
+           xtest=finaldf[test.id, exposures],
+           ytest=finaldf[test.id,"resid"],
+           # xtest=finaldf[, exposures], 
+           # ytest=finaldf[,"resid"], 
+           n.iter=10, 
+           n.core=3,
+           select.iter = T,
+           n.bootstrap=250
+)
+
+dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.5,])
+dypt$synergy <- rep(NA_real_,nrow(dypt))
+for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
+(c<- dypt[dypt$synergy == 0,])
+
+# int prevalence precision          cpe sta.cpe        fsd sta.fsd
+# 7 BP3+_DCP25+ 0.08078288 0.5062380 -0.005791686   0.056 0.01751451       1
+# 9   BP3+_MEP+ 0.07641010 0.5007765 -0.007224720   0.008 0.01179003       1
+# mip sta.mip stability synergy
+# 7 -0.016888504   0.016     0.544       0
+# 9 -0.007702668   0.180     0.564       0
+
+
+##########################################
+##########################################
+##########################################
+
+intersect(intersect(a$int, b$int), c$int)
+
+
