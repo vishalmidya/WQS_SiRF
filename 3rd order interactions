@@ -1,0 +1,146 @@
+library("xgboost")
+library('gWQS')
+library('MASS')
+library("car")
+library("mvtnorm")
+library("dplyr")
+library('doMC')
+library('doParallel')
+library("gbm")
+library("iRF")
+library('ggplot2')
+
+
+########################################################################################################################################################################
+
+make.SIGMA <- function(rho,dimension){
+  SIGMA = matrix(NA,dimension,dimension)
+  for(i in 1:dimension){
+    for(j in 1:dimension){
+      if(i != j){
+        a <- sign(rnorm(1,0,1))*rnorm(1,0.1, 0.01)
+        if(a>0) {SIGMA[i,j] = rho + a}
+        else if (a <0)  {SIGMA[i,j] = rho}
+      }
+      else if (i == j){
+        SIGMA[i,j] = 1
+      }
+    }
+  }
+  
+  (SIGMA + t(SIGMA))/2
+}
+
+make.X0 <- function(n, rho, p0){
+  X0 <- (mvtnorm::rmvnorm(n, mean = rep(0, nrow(make.SIGMA(rho, p0))), sigma = make.SIGMA(rho, p0)))
+}
+
+########################################################################################################################################################################
+
+###### 3rd order
+
+n = 479
+p0 = 62
+set.seed(11194323)
+X <- make.X0(n, 0.4, p0)
+covariates <- make.X0(n,0.1,4)
+data_sim <- as.data.frame(X)
+
+binarize <- function(x){
+  as.numeric(x > quantile(x , 0.50) )  
+}
+
+create.y <- function(x){
+  bb <- as.data.frame(apply(x, 2, binarize))
+  k <- rep(1,nrow(bb))
+  for(i in 1:ncol(bb)){
+    k <- k * bb[,i]
+  }
+  return(k)
+}
+
+interact_columns <- c(1,3,5)
+#table(create.y(X[,interact_columns]))/sum(table(create.y(X[,interact_columns])))
+
+
+# Generating the outcome and covariates
+
+y <-  (X[,1:2] %*% c(0.1,0.1)) +  create.y(X[,interact_columns]) + covariates %*% c(0.06,0.06,0.06,0.06)
+set.seed(runif(1,0,3.75e4))
+data_sim$outcome <- y + rnorm(n, 0, 0.25)
+data_sim <- cbind(data_sim,covariates)
+colnames(data_sim)[(p0+2):(p0+5)] <- paste0("cov",c(1:4))
+exposures <- paste0("V",seq(1:p0))
+
+# Run WQS and extract residuals
+
+gg <- gwqs(outcome ~ wqs + cov1 + cov2 + cov3 + cov4,
+           mix_name = exposures, data = data_sim, q = NULL, signal = "t2",
+           validation = 0, b = 200, rs = T,   n_vars = p0/3,
+           b1_pos = T,  family = "gaussian",plan_strategy = "multicore")
+
+data_sim$residuals <-  gg$fit$residuals
+data_sim$wqs <-  gg$wqs
+
+# Run SiRF
+## Data Partitioning 1
+
+set.seed(12345)
+train.id <- 1:(2/3*n)
+test.id <- setdiff(1:n, train.id)
+fit <- iRF(x=data_sim[train.id,c(paste0("V",seq(1:p0)))], 
+           y=data_sim[train.id,"residuals"], 
+           xtest=data_sim[test.id,c(paste0("V",seq(1:p0)))], 
+           ytest=data_sim[test.id,"residuals"], 
+           n.iter=10, 
+           n.core=4,
+           select.iter = T,
+           n.bootstrap=250
+)
+
+dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.75,])
+dypt$synergy <- rep(NA_real_,nrow(dypt))
+for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
+(b <- dypt[dypt$synergy == 0,])
+
+# int prevalence precision       cpe sta.cpe        fsd sta.fsd
+# 1     V1+_V3+  0.2609874 0.7617263 0.1699945       1 0.09749795       1
+# 2 V1+_V3+_V5+  0.1772712 0.8738028 0.1487337       1 0.11631947       1
+# 3     V3+_V5+  0.2177556 0.7291932 0.1276000       1 0.07244488       1
+# 4     V1+_V5+  0.2173312 0.7257809 0.1257506       1 0.06102698       1
+# mip sta.mip stability synergy
+# 1 0.1425578       1     1.000       0
+# 2 0.1120765       1     0.988       0
+# 3 0.1100248       1     1.000       0
+# 4 0.1315669       1     1.000       0
+
+## Data Partitioning 2
+
+set.seed(1234575)
+train.id <- 1:(3/4*n)
+test.id <- setdiff(1:n, train.id)
+fit <- iRF(x=data_sim[train.id,c(paste0("V",seq(1:p0)))], 
+           y=data_sim[train.id,"residuals"], 
+           xtest=data_sim[test.id,c(paste0("V",seq(1:p0)))], 
+           ytest=data_sim[test.id,"residuals"], 
+           n.iter=10, 
+           n.core=4,
+           select.iter = T,
+           n.bootstrap=250
+)
+
+dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.75,])
+dypt$synergy <- rep(NA_real_,nrow(dypt))
+for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
+(c <- dypt[dypt$synergy == 0,])
+
+# int prevalence precision        cpe sta.cpe        fsd sta.fsd
+# 1     V1+_V3+  0.2713764 0.7362811 0.17164862       1 0.09090831       1
+# 2     V3+_V5+  0.2433854 0.6719668 0.12145602       1 0.05595141       1
+# 3 V1+_V3+_V5+  0.1551646 0.8082862 0.11739913       1 0.07783096       1
+# 4     V1+_V5+  0.1973386 0.6721519 0.09854011       1 0.02060053       1
+# mip sta.mip stability synergy
+# 1 0.13013098       1     1.000       0
+# 2 0.06581665       1     1.000       0
+# 3 0.07200511       1     0.888       0
+# 4 0.09090519       1     1.000       0
