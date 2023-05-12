@@ -1,0 +1,141 @@
+finaldf <- read.csv("....\\finaldf.csv")
+finaldf$MMC_4cat <- as.character(finaldf$MMC_4cat)
+finaldf$crace <- as.character(finaldf$crace)
+finaldf$OwnHome <- as.character(finaldf$OwnHome)
+exposures <- colnames(finaldf)[11:72]
+
+exposures <- colnames(finaldf)[11:72]
+exposures <- exposures[!(exposures %in% c("BP2","BPAF","BPB","BPZ","BZPB","HEPB","TCC","TCP245","MCHP","MCHPP","MHXP","MINP","MIPP","MMP","MOP","MPEP","DEDP","Be"))]
+
+gg <- gwqsrh(ASD ~ wqs + csex + crace + cage + YOB + OwnHome + MMC_4cat + AgeMomYrs,
+             mix_name = exposures, data = finaldf, q = 10, signal = "t2",
+             b = 500, rs = T,   n_vars = 10, rh = 75, validation = 0.25, 
+             seed = 123123123, 
+             b1_pos = T,  family = "binomial",plan_strategy = "multicore")
+finaldf$wqs_q_10_sen <- gg$wqs
+fit <- glm(ASD ~ wqs_q_10_sen + csex + crace + cage + YOB + OwnHome + MMC_4cat + AgeMomYrs, data = finaldf, family = "binomial")
+finaldf$resid <-  resid(fit, type="pearson")
+n <- nrow(finaldf)
+
+# 75 training  and 25 testing
+
+set.seed(123456)
+train.id <- sample(seq(1,n), ceiling(n*75/100))
+test.id <- setdiff(1:n, train.id)
+
+set.seed(123456)
+fit <- iRF(x=finaldf[train.id, exposures], 
+           y=finaldf[train.id,"resid"], 
+           xtest=finaldf[test.id, exposures],
+           ytest=finaldf[test.id,"resid"],
+           n.iter=5, 
+           n.core=1,
+           select.iter = T,
+           n.bootstrap=250
+)
+
+dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.5,])
+dypt$synergy <- rep(NA_real_,nrow(dypt))
+for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
+(a <- dypt[dypt$synergy == 0,])
+
+#             int prevalence precision          cpe sta.cpe           fsd sta.fsd
+# 1      DEP+_Mo+ 0.06943875 0.5637056  0.016568219   1.000  5.965544e-03   0.988
+# 3    DEP+_MEPB+ 0.04872665 0.5655678  0.011940504   1.000  4.583449e-05   0.508
+# 5       DEP+_U+ 0.04210228 0.5416688  0.007082599   1.000  2.292185e-04   0.540
+# 7      DEP+_Tl+ 0.05086059 0.5267836  0.005942605   1.000  3.620332e-03   0.880
+# 9  DEP+_TCP246+ 0.07784011 0.4795233 -0.005180411   0.048  2.040902e-03   0.656
+# 10   DEP+_MCPP+ 0.05225069 0.4605191 -0.007895697   0.000  2.995716e-03   0.868
+# 11  DEP+_MCMHP+ 0.06124345 0.4489652 -0.012619712   0.000  3.077140e-03   0.844
+# 12     Cd+_DEP+ 0.07797243 0.4562020 -0.013321881   0.000  2.854617e-03   0.772
+# 13   BPAP+_DEP+ 0.09412475 0.4438182 -0.021725285   0.000 -4.270909e-03   0.136
+#
+# mip sta.mip stability synergy
+# 1   0.0098682225   0.884     0.864       0
+# 3  -0.0023768718   0.384     0.664       0
+# 5   0.0005738154   0.524     0.528       0
+# 7   0.0064456489   0.784     0.576       0
+# 9  -0.0157104000   0.040     0.764       0
+# 10 -0.0346684177   0.000     0.504       0
+# 11 -0.0462222888   0.000     0.596       0
+# 12 -0.0389855114   0.000     0.708       0
+# 13 -0.0513692486   0.000     0.792       0
+
+
+# 80 training  and 20 testing
+
+set.seed(123456)
+train.id <- sample(seq(1,n), ceiling(n*80/100))
+test.id <- setdiff(1:n, train.id)
+
+set.seed(123456)
+fit <- iRF(x=finaldf[train.id, exposures], 
+           y=finaldf[train.id,"resid"], 
+           xtest=finaldf[test.id, exposures],
+           ytest=finaldf[test.id,"resid"],
+           n.iter=5, 
+           n.core=1,
+           select.iter = T,
+           n.bootstrap=250
+)
+
+dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.5,])
+dypt$synergy <- rep(NA_real_,nrow(dypt))
+for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
+(b <- dypt[dypt$synergy == 0,])
+
+#             int prevalence precision          cpe sta.cpe          fsd sta.fsd
+# 4 DEP+_TCP246+ 0.08606249 0.4846168 -0.004066487    0.08 0.0017952303   0.644
+# 5     Cd+_DEP+ 0.09309935 0.4613215 -0.013925302    0.00 0.0047336034   0.888
+# 6  DEP+_MCMHP+ 0.07066624 0.4444876 -0.016307859    0.00 0.0045829446   0.920
+# 7   BPAP+_DEP+ 0.09032188 0.4504414 -0.018170456    0.00 0.0001063391   0.504
+# 
+# mip sta.mip stability synergy
+# 4 -0.01685683   0.016     0.808       0
+# 5 -0.04015194   0.000     0.856       0
+# 6 -0.05698580   0.000     0.628       0
+# 7 -0.05103201   0.000     0.724       0
+
+
+# 70 training  and 30 testing
+
+set.seed(123456)
+train.id <- sample(seq(1,n), ceiling(n*70/100))
+test.id <- setdiff(1:n, train.id)
+
+set.seed(123456)
+fit <- iRF(x=finaldf[train.id, exposures], 
+           y=finaldf[train.id,"resid"], 
+           xtest=finaldf[test.id, exposures],
+           ytest=finaldf[test.id,"resid"],
+           n.iter=5, 
+           n.core=1,
+           select.iter = T,
+           n.bootstrap=250
+)
+
+dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.5,])
+dypt$synergy <- rep(NA_real_,nrow(dypt))
+for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
+(c<- dypt[dypt$synergy == 0,])
+
+#            int prevalence precision          cpe sta.cpe           fsd sta.fsd
+# 1      DEP+_U+ 0.06208796 0.5526366  0.014030068   1.000  0.0008193367   0.640
+# 4   DEP+_DETP+ 0.05505132 0.5061829  0.003722554   0.936 -0.0053284327   0.044
+# 6 DEP+_TCP246+ 0.06740631 0.4736778 -0.004177309   0.040  0.0023239934   0.756
+# 7  DEP+_MCMHP+ 0.07357213 0.4469175 -0.013421569   0.000  0.0042264574   0.896
+# 8     Cd+_DEP+ 0.08525741 0.4447499 -0.016420023   0.000  0.0046230097   0.896
+# 9   BPAP+_DEP+ 0.10823769 0.4429829 -0.021793322   0.000 -0.0027420307   0.260
+# 
+#            mip sta.mip stability synergy
+# 1  0.002223469   0.592     0.868       0
+# 4  0.017910699   0.956     0.660       0
+# 6 -0.012870805   0.056     0.624       0
+# 7 -0.039604533   0.000     0.708       0
+# 8 -0.041772102   0.000     0.756       0
+# 9 -0.043539133   0.000     0.884       0
+
+
+intersect(intersect(a$int, b$int), c$int)
+# [1] "DEP+_TCP246+" "DEP+_MCMHP+"  "Cd+_DEP+"  "BPAP+_DEP+"
+
