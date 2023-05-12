@@ -1,0 +1,58 @@
+library("xgboost")
+library('gWQS')
+library('MASS')
+library("car")
+library("mvtnorm")
+library("dplyr")
+library('doMC')
+library('doParallel')
+library("gbm")
+library('ggplot2')
+library("bkmr")
+library("spatstat")
+
+finaldf <- read.csv(".....\\finaldf.csv")
+finaldf$MMC_4cat <- as.character(finaldf$MMC_4cat)
+finaldf$crace <- as.character(finaldf$crace)
+finaldf$OwnHome <- as.character(finaldf$OwnHome)
+exposures <- colnames(finaldf)[11:72]
+
+y <- finaldf$ASD
+X <- finaldf[,c('csex', 'crace', 'cage', 'YOB',  'OwnHome', 'MMC_4cat' , 'AgeMomYrs')]
+X <- dummify(X)
+X <- X[,c('csex.F', 'crace.1', 'crace.2', 'cage', 'YOB', 'OwnHome.0',  'MMC_4cat.0', 'MMC_4cat.1', 'MMC_4cat.2', 'AgeMomYrs')]
+Z <- finaldf[,exposures]
+
+# Main BKMR Analysis
+
+set.seed(123456)
+fitkm_charge <- kmbayes(y = y, Z = as.data.frame((Z)), X = as.data.frame((X)), iter = 3000, 
+                               family = "binomial",verbose = T, varsel = F, est.h = T)
+
+pred.resp.bivar <- PredictorResponseBivar(fit = fitkm_charge, Z = Z[,c("Cd","DEP","TCP246")],  min.plot.dist = 1)
+
+pred.resp.bivar.levels <- PredictorResponseBivarLevels(
+  pred.resp.df = pred.resp.bivar, Z = Z[,c("Cd","DEP","TCP246")], qs = c(0.25, 0.5, 0.75))
+
+png(filename = "C:/Users/midyav01/OneDrive - The Mount Sinai Hospital/MSSM Projects/MOXIES/iRF toxics/Drafts/versions/interaction.png",width = 5000, height = 4000, res = 500)
+
+ggplot(pred.resp.bivar.levels, aes(z1, est)) + 
+  geom_smooth(aes(col = quantile), stat = "identity") + 
+  facet_grid(variable2 ~ variable1) +
+  ggtitle("h(expos1 | quantiles of expos2)") +
+  xlab("expos1")
+
+dev.off()
+
+# Estimated posterior inclusion probabilities
+
+pip_charge <- ExtractPIPs(fitkm_charge)
+
+# Overall Risk summaries
+## Overall Risk Table
+
+risks.overall_OC_Pesticides <- OverallRiskSummaries(fit = fitkm_charge, y = y, Z = Z[,c("Cd","DEP", "TCP246")], X = X, 
+                                                    qs = seq(0.05, 0.95, by = 0.05), q.fixed = 0.5, method = "approx")
+
+ggplot(risks.overall_OC_Pesticides, aes(quantile, est, ymin = est - 1.96*sd, ymax = est + 1.96*sd)) + geom_pointrange()
+
