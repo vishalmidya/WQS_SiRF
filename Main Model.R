@@ -221,6 +221,9 @@ for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% 
 # 6 -0.040173613   0.000     0.944       0
 # 7 -0.039682690   0.000     0.928       0
 
+
+## Final Result
+
 intersect(intersect(a$int, b$int), c$int)
 # [1] "DEP+_TCP246+" "Cd+_DEP+"
 
