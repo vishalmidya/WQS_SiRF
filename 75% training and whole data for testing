@@ -1,0 +1,36 @@
+train.id <- sample(seq(1,n), ceiling(n*75/100))
+test.id <- setdiff(1:n, train.id)
+
+permdata <- finaldf
+permdata$resid <- sample(permdata$resid)
+
+fit <- iRF(x=permdata[train.id, exposures], 
+           y=permdata[train.id,"resid"], 
+           xtest=permdata[, exposures],
+           ytest=permdata[,"resid"],
+           n.iter=5, 
+           n.core=1,
+           select.iter = T,
+           n.bootstrap=250
+)
+
+dypt <- as.data.frame(fit$interaction[fit$interaction$stability > 0.5,])
+dypt$synergy <- rep(NA_real_,nrow(dypt))
+for(i in 1:nrow(dypt)) dypt$synergy[i] <- sum( strsplit(dypt$int,"+")[[i]] %in% "-")
+(d <- dypt[dypt$synergy == 0,])
+
+#            int prevalence precision          cpe sta.cpe           fsd sta.fsd
+# 2     DEP+_Mo+ 0.07645371 0.5584253  0.016950446   1.000  0.0055674146   0.980
+# 3   DEP+_MEPB+ 0.05329762 0.5730775  0.014251962   1.000 -0.0003566124   0.464
+# 5      DEP+_U+ 0.04891858 0.5474935  0.009142075   1.000  0.0003259385   0.552
+# 6 DEP+_TCP246+ 0.08277110 0.4800561 -0.005390493   0.028  0.0017664920   0.684
+# 7     Cd+_DEP+ 0.10020845 0.4602781 -0.015344472   0.000  0.0042578850   0.848
+# 8   BPAP+_DEP+ 0.11737824 0.4493577 -0.024043531   0.000 -0.0096154233   0.008
+# 
+#             mip sta.mip stability synergy
+# 2  0.010076128   0.912     0.936       0
+# 3 -0.004036495   0.344     0.696       0
+# 5  0.004338129   0.676     0.620       0
+# 6 -0.017385707   0.012     0.792       0
+# 7 -0.037163744   0.000     0.848       0
+# 8 -0.048084104   0.000     0.928       0
