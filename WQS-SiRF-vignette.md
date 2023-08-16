@@ -21,4 +21,5 @@ Kindly install the following `R` packages
 3. `iRF`
 
 Find the instructions [here](https://github.com/sumbose/iRF/tree/master) to install the `iRF` package.
-See details on how to use the gWQS model [here](https://cran.r-project.org/web/packages/gWQS/vignettes/gwqs-vignette.html).
+
+See details on how to use the `gWQS` model [here](https://cran.r-project.org/web/packages/gWQS/vignettes/gwqs-vignette.html).
