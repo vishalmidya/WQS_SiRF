@@ -25,7 +25,7 @@ Find the instructions [here](https://github.com/sumbose/iRF/tree/master) to inst
 
 See details on how to use the `gWQS` model [here](https://cran.r-project.org/web/packages/gWQS/vignettes/gwqs-vignette.html).
 
-## Creating a 3<sup>rd</sup> ordered non-linear interaction and an outcome
+## Data generating Process: creating a 3<sup>rd</sup> ordered non-linear interaction and an outcome
 
 1. __Run the following chunk of functions:__
 
@@ -64,7 +64,7 @@ p0 = 25
 set.seed(123456)
 X <- make.X0(n, 0.2, p0)
 ```
-All the `25` exposures are already supplied in the dataset. These are named as, `V1`, `V2`,..., and `V25`.  
+All the `25` exposures are already supplied in the dataset. These are named, `V1`, `V2`,..., and `V25`.  
 
 2. __Next, we create four covariates that are moderately correlated to each other__
 
@@ -96,14 +96,68 @@ We create a Gaussian outcome composed of the mixture effect and the indicator fo
 set.seed(45667)
 (X[,c(1,5,10,15,20)] %*% c(0.1,0.1, 0.1, 0.1,0.1)) +  three_clique + covariates %*% c(0.06,0.06,0.06,0.06) + rnorm(n, 0, 0.2)
 ```
-This outcome is already supplied in the dataset. However, note that the effect size of the `three_clique` is set at `1`. Further, note that individually `(outcome ~ Taxa + cov1 + cov2 + cov3 + cov4)`, the relative abundances of the three Taxa are _not_ significantly associated with the outcome. Only through the three-ordered clique, is there a significant statistical association.  
+This outcome is already supplied in the dataset. However, note that the effect size of the `three_clique` is set at `1` and the mixture effect is set at `0.5`
+
+## The aim of this algorithm
+
+1. To recover the mixture effect (joint mixture effect in apriori selected direction - WQS or overall mixture effect - qgcomputation)
+2. To recover the 3<sup>rd</sup> order interaction of `V1`, `V3`, and `V11`.
+3. To recover the thresholds for the construction of the interaction.
+4. To estimate the effect of the interaction on the outcome.
+
+## WQS-SiRF Algorithm
+
+1. __Generalized Weighted Quantile Sum Regression__
+
+First, we fitted a `gwqs` model. We implemented the random subset and repeated holdout variants of WQS <sup>3,4</sup> to make the analysis robust. We kept `40%` of the data for validation, and repeated the holding-out procedure for `50` iterations, with `200` bootstraps each time. Given the apriori hypothesized directionality (think the adverse effect of chemical mixture), we chose `b1_pos = T`. 
 
 ```{}
-             Estimate Std. Error t value Pr(>|t|)
-V1      -0.009965   0.006567  -1.517 0.129816    
-V3       0.007614   0.006652   1.145  0.25297    
-V11      0.008184   0.006479   1.263 0.207165    
-clique        1.24607    0.06482  19.223  < 2e-16 ***
+exposures <- paste0("V",seq(1:25))
+gg <- gwqsrh(outcome ~ wqs + cov1 + cov2 + cov3 + cov4,
+           mix_name = exposures, data = data.simulated, q = NULL, signal = "t2",
+           validation = 0.4, b = 200, rs = T,  n_vars = p0/2, rh = 50, 
+           b1_pos = T,  family = "gaussian",plan_strategy = "multicore")
+
+summary(gg)
+```
+The result is shown below:
+
+```{}
+             Estimate Std. Error   2.5 % 97.5 %
+ (Intercept)  0.17661    0.01873 0.13990  0.213
+ wqs          0.61232    0.04246 0.52910  0.696
+ cov1         0.07110    0.02669 0.01878  0.123
+ cov2         0.07065    0.02662 0.01847  0.123
+ cov3         0.07263    0.02967 0.01448  0.131
+ cov4         0.06899    0.02151 0.02684  0.111
+```
+
+2. __Extract the residuals from the Generalized Weighted Quantile Sum Regression__
+
+The extracted residual from this `gwqs` model, named `wqs.residuals`, has been added to the simulated dataset. Note that, for a binary outcome, one can use the _Pearson residuals_, which exhibit asymptotic normal properties for large samples. This residual, `wqs.residuals` is the outcome.
+
+Further, note that individually `(wqs.residual ~ exposure + cov1 + cov2 + cov3 + cov4)`, the concentrations of the three exposures may _not_ be significantly associated with the outcome. But through the three-ordered interaction, there is a significant statistical association.  
+
+```{}
+             Estimate Std. Error t value  Pr(>|t|)
+V1          -0.061736   0.020194  -3.057  0.00235 **
+V3           0.005712   0.019172   0.298    0.766
+V11          0.025359   0.020004   1.268    0.205
+three_clique  0.87192    0.03281   26.57   <2e-16 ***
 
 ```
+
+
+
+
+
+
+
+References:
+
+1. ff
+2. ff
+3. Tanner, E. M.; Bornehag, C.-G.; Gennings, C. Repeated holdout validation for weighted quantile sum regression. MethodsX. 2019, 6, 2855−2860.
+4. Curtin, P.; Kellogg, J.; Cech, N.; Gennings, C. A random subset implementation of weighted quantile sum (WQSRS) regression for analysis of high-dimensional mixtures. Communications in Statistics - Simulation and Computation. 2021, 50, 1119−1134.
+
 
