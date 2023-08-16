@@ -105,7 +105,6 @@ This outcome is already supplied in the dataset. However, note that the effect s
 3. To recover the thresholds for the construction of the interaction.
 4. To estimate the effect of the interaction on the outcome.
 
-Note that, there are a total of `300` two-ordered, and `2300` three-ordered combinations to choose from `25` exposures. On top of that, one needs to find the thresholds and determine the directionality.  Further, as the number of exposures increases, the total number of possible combinations to test from exponentially increases. Therefore, we used the signed-iterated Random Forest (SiRF) algorithm to search for the optimal combinations. Further, we introduced a repeated-holdout stage on the SiRF algorithm to keep the false positives and negatives in check.
 
 ## WQS-SiRF Algorithm
 
@@ -136,9 +135,7 @@ The result is shown below:
 
 2. __Extract the residuals from the Generalized Weighted Quantile Sum Regression__
 
-The extracted residual from this `gwqs` model, named `wqs.residuals`, has been added to the simulated dataset. Note that, for a binary outcome, one can use the _Pearson residuals_, which exhibit asymptotic normal properties for large samples. This residual, `wqs.residuals` is the outcome.
-
-Further, note that individually `(wqs.residual ~ exposure + cov1 + cov2 + cov3 + cov4)`, the concentrations of the three exposures may _not_ be significantly associated with the outcome. But through the three-ordered interaction, there is a significant statistical association.  
+The extracted residual from this `gwqs` model, named `wqs.residuals`, has been added to the simulated dataset. Note that, for a binary outcome, one can use the _Pearson residuals_, which exhibit asymptotic normal properties for large samples. This residual, `wqs.residuals` is the outcome. Further, note that individually `(wqs.residual ~ exposure + cov1 + cov2 + cov3 + cov4)`, the concentrations of the three exposures may _not_ be significantly associated with the outcome. But through the three-ordered interaction, there is a significant statistical association.  
 
 ```{}
              Estimate Std. Error t value  Pr(>|t|)
@@ -148,9 +145,133 @@ V11          0.025359   0.020004   1.268    0.205
 three_clique  0.87192    0.03281   26.57   <2e-16 ***
 
 ```
+Note that, there are a total of `300` two-ordered, and `2300` three-ordered combinations to choose from `25` exposures. On top of that, one needs to find the thresholds and determine the directionality.  Further, as the number of exposures increases, the total number of possible combinations to test from exponentially increases. Therefore, we used the signed-iterated Random Forest (SiRF) algorithm to search for the optimal combinations. Further, we introduced a repeated-holdout stage on the SiRF algorithm to keep the false positives and negatives in check.
 
+## Finding the optimal combination of exposures
 
+Run the following function that finds the most frequently occurring combinations of exposures:
+Copy this code chunk below and run it.
 
+```{}
+require("iRF")
+clique.finder <- function(exposures, outcome, iterations, validation, seed.value, n.bootstrap, min.prevalence, min.stability, data){
+  n <- dim(data)[1]
+  if(n == 0){
+    stop("Provide a dataset in data.frame format") 
+  }
+  if(length(exposures) < 2){
+    stop("Need at least two exposures to find a clique") 
+  }
+  if(validation == 0 | validation >=1){
+    stop("Validation must be a positive fraction within 0 and 1") 
+  }
+  train.sample <- 1 - validation
+  if(iterations < 50){
+    warning("Use more than 50 iterations for reliable replication")
+  }
+  if(n.bootstrap < 100){
+    warning("Use more than 100 bootstraps for reliable replication")
+  }
+  tab <- data.frame( int = NA_character_,  prevalence = NA_real_, precision = NA_real_, cpe = NA_real_,
+                     sta.cpe = NA_real_,  fsd = NA_real_, sta.fsd = NA_real_, mip = NA_real_,
+                     sta.mip = NA_real_, stability =NA_real_, occurance.freq = NA_character_ , occurance.freq.sum = NA_real_)
+  for(i in 1:iterations){
+    set.seed(runif(1, 0, (seed.value + 10)))
+    train.id <- sample(seq(1,n), ceiling(n*train.sample))
+    test.id <- setdiff(1:n, train.id)
+    fit <- iRF(x=data.simulated[train.id, exposures], 
+               y=data.simulated[train.id,outcome], 
+               xtest=data.simulated[test.id, exposures],
+               ytest=data.simulated[test.id,outcome],
+               n.iter=10, 
+               n.core=3,
+               select.iter = T,
+               n.bootstrap=n.bootstrap
+    )
+    SiRF_table <- as.data.frame(fit$interaction[fit$interaction$stability > min.stability,])
+    if(dim(SiRF_table)[1] != 0){
+      
+      SiRF_table_subset <- SiRF_table
+      SiRF_table_subset_prev <- SiRF_table_subset[SiRF_table_subset$prevalence > min.prevalence,]
+      
+      if(dim(SiRF_table_subset_prev)[1] != 0){
+        nam <- NA_character_
+        for(i in 1:nrow(SiRF_table_subset_prev)){nam <- c(nam, strsplit(SiRF_table_subset_prev$int[i],"_")[[1]])}
+        yt<-as.data.frame(table(nam))
+        SiRF_table_subset_prev$occurance.freq <- rep(NA_character_,nrow(SiRF_table_subset_prev))
+        for(i in 1:nrow(SiRF_table_subset_prev)){
+          SiRF_table_subset_prev$occurance.freq[i] <- as.character((paste0(yt$Freq[which(yt$nam == strsplit(SiRF_table_subset_prev$int[i],"_")[[1]][1])],"/",yt$Freq[which(yt$nam == strsplit(SiRF_table_subset_prev$int[i],"_")[[1]][2])])))
+        }
+        SiRF_table_subset_prev$occurance.freq.sum <- rep(NA_character_,nrow(SiRF_table_subset_prev))
+        for(i in 1:nrow(SiRF_table_subset_prev)){
+          SiRF_table_subset_prev$occurance.freq.sum[i] <- sum(strsplit(SiRF_table_subset_prev$occurance.freq[i],"/")[[1]] %in% "1")
+        }
+        tab <- rbind(tab, SiRF_table_subset_prev)
+      } else {
+        tab <- rbind(tab, SiRF_table_subset_prev)
+      }
+    } else {
+      tab <- rbind(tab, SiRF_table)
+    }
+  }
+  clique <- tab
+  if(dim(tab)[1] == 1){
+    stop("No clique was found, decrease the value of min.stability and increase the number of bootstraps")
+  }
+  clique <- clique[-1,]
+  for(i in 1:nrow(clique)){
+    if(sum(strsplit(clique$int[i],"")[[1]] %in% "+") != 0 & sum(strsplit(clique$int[i],"")[[1]] %in% "-") == 0){
+      x <- strsplit(clique$int[i],"+")[[1]]
+      clique$int[i] <- paste0(x[x!= "+"], collapse = "")  
+    } else if(sum(strsplit(clique$int[i],"")[[1]] %in% "-") != 0 & sum(strsplit(clique$int[i],"")[[1]] %in% "+") == 0){
+      x <- strsplit(clique$int[i],"-")[[1]]
+      clique$int[i] <- paste0(x[x!= "-"], collapse = "")  
+    } else if (sum(strsplit(clique$int[i],"")[[1]] %in% "-") != 0 & sum(strsplit(clique$int[i],"")[[1]] %in% "+") != 0){
+      x <- strsplit(clique$int[i],"")[[1]]
+      clique$int[i] <- paste0(x[x!= "-" & x!= "+"], collapse = "")  
+    }
+  }
+  rtf <- as.data.frame(table(clique$int))
+  rtf <- rtf[order(rtf$Freq, decreasing = T),]
+  return(as.data.frame(rtf))
+}
+```
+
+Finally, run the `function` called `clique.finder`. This is the main function where you can change its arguments. Below we discuss each argument for this function and what they entail.
+
+```{}
+clique.finder(exposures = paste0("V", seq(1,25)), outcome = "wqs.residuals",  iterations = 500, validation = 0.4, 
+              seed.value = 1234, n.bootstrap = 200, min.prevalence = 0.05, min.stability = 0.25, data = data.simulated)
+```
+
+1. `exposures`: a vector of all possible exposures (among which one intends to find the combinations)
+2. `outcome`: name of the outcome variable
+3. `iterations`: the number of repeated holdouts (should be more than 100)
+4. `validation`: the proportion of the dataset which is set aside for validation at each repeated holdout iteration 
+5. `seed.value`: random initial seed value for partitioning the dataset
+6. `n.bootstrap`: the number of bootstrap iterations employed at each of the repeated holdouts on the training dataset (should be more than 100)
+7. `min.prevalence`: the minimum proportion (lower bound) of the sample that has the clique. Here we chose `5%` as the lower bound of the prevalence. 
+8. `min.stability`: the stability implies the proportion of times the combination was recovered across bootstrap replicates. The `min.stability` is the lower bound. Here we chose `25%` as the lower bound.
+9. `data`: name of the dataset
+
+Note that lowering the values of `min.prevalence` and `min.stability` finds more combinations of exposures; however, due to the implementation of the repeated holdout technique, lowering these bounds does not significantly affect the most stable or most frequently occurring combinations. In this example, we used `500` repeated holdouts. One can utilize the [parallel R package](https://www.rdocumentation.org/packages/parallel/versions/3.6.2) for fast parallel computation. The same code can be used for binary outcomes as well.
+
+Here is the result of the top 10 combinations obtained from the simulated dataset
+
+```{}
+         Var1    Freq
+       V11_V3 19.1023
+        V1_V3 18.9960
+       V1_V11 16.8688
+    V1_V11_V3  5.3499
+       V1_V19  3.8609
+       V1_V25  3.2972
+       V1_V24  3.0951
+        V1_V8  2.4782
+       V25_V3  2.3931
+        V1_V7  2.3825
+```
+The first column, `Var1`, denotes all possible combinations picked up by the algorithm, and the `Freq` denotes the percentage of their occurrence over all possible detected combinations and all bootstrap and repeated holdout combinations. The total number of detected unique combinations is around `80`. Note the top three combinations, `V11/V3`, `V1/V11`, and `V1/V3`, occurred the most (more than 10%) among all possible detected combinations. Moreover, a three-ordered `V1/V11/V3` combination was among the most occurring. The three-ordered combination of `V1/V11/V3` induced a downstream of further two-ordered combinations. With smaller sample sizes, this tool effectively detects lower-ordered combinations. However, as the sample size increases, the frequency of the true higher-ordered combinations also increases. Although this is very subjective, a good practice is to choose the top (first three or first five) most frequently occurring combinations as long as they form a clique.  Although we found the exposure combination, how it is associated with the outcome or the directionality is unknown. In the next stage, we estimate the thresholds of the exposures and its association with the outcome. 
 
 
 
