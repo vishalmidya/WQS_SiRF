@@ -105,6 +105,8 @@ This outcome is already supplied in the dataset. However, note that the effect s
 3. To recover the thresholds for the construction of the interaction.
 4. To estimate the effect of the interaction on the outcome.
 
+Note that, there are a total of `300` two-ordered, and `2300` three-ordered combinations to choose from `25` exposures. On top of that, one needs to find the thresholds and determine the directionality.  Further, as the number of exposures increases, the total number of possible combinations to test from exponentially increases. Therefore, we used the signed-iterated Random Forest (SiRF) algorithm to search for the optimal combinations. Further, we introduced a repeated-holdout stage on the SiRF algorithm to keep the false positives and negatives in check.
+
 ## WQS-SiRF Algorithm
 
 1. __Generalized Weighted Quantile Sum Regression__
