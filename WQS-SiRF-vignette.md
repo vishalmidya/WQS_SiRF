@@ -275,7 +275,7 @@ The first column, `Var1`, denotes all possible combinations picked up by the alg
 
 ## Estimating the thresholds of the microbial clique and its association with the outcome
 
-Run the following function that finds the thresholds for relative abundances of `V1`, `V3`, and `V11`. Each Taxa's directionality is chosen based on its univariate association. The following code _should only be used_ based on the output from the `clique.finder` function; otherwise, overfitting is possible. 
+Run the following function that finds the thresholds for the exposures `V1`, `V3`, and `V11`. Each exposure's directionality is chosen based on its univariate association with the outcome. The following code _should only be used_ based on the output from the `clique.finder` function; otherwise, overfitting is possible. 
 
 ```{}
 
@@ -367,15 +367,14 @@ Finally, run the `function` called `clique.tba`. Below we discuss each argument 
 
 ```{}
 clique.tba(clique.names = c("V1", "V3", "V11"), outcome= "wqs.residuals", 
-           grid.quantile = seq(0.2, 0.8, 0.1), min.prevalence = 0.1, family = "gaussian", data = data.simulated)
+           grid.quantile = seq(0.2, 0.8, 0.1), min.prevalence = 0.05, family = "gaussian", data = data.simulated)
 ```
-1. `clique.names`: a vector containing the names of most frequently occurring Taxa that form a "clique". We chose `V1`, `V3`, and `V11` based on the output from `clique.finder`.
+1. `clique.names`: a vector containing the names of the most frequently occurring exposures obtained from the previous code chunk. We chose `V1`, `V3`, and `V11` based on the output from `clique.finder`.
 2. `outcome`: name of the outcome variable
-3. `covariates`: a vector containing the names of the covariates
-4. `grid.quantile`: choices of the quantiles to search for the thresholds. We removed the lower and upper 20<sup>th</sup> quantiles for stable results. 
-5. `min.prevalence`: the minimum proportion (lower bound) of the sample that has the clique. Here we chose `10%` as the lower bound of the prevalence. 
-6. `family`: choice of `glm` family of distributions
-7. `data`: name of the dataset
+3. `grid.quantile`: choices of the quantiles to search for the thresholds. We removed the lower and upper 20<sup>th</sup> quantiles for stable results. 
+4. `min.prevalence`: the minimum proportion (lower bound) of the sample that has the combination. Here we chose `10%` as the lower bound of the prevalence. 
+5. `family`: choice of `glm` family of distributions
+6. `data`: name of the dataset
 
 I'm sharing below the final output from the simulated example.
 
@@ -384,7 +383,7 @@ I'm sharing below the final output from the simulated example.
  <=60th Percentile >=40th Percentile >=40th Percentile          0.188   0.8719229 0.03281273 1.558698e-97
 ```
 
-The `V1:Threshold`, `V3:Threshold`, and `V11:Threshold` denote the estimated thresholds for `V1`, `V3`, and `V11`, respectively. Therefore, this microbial clique is formed in those having (1) V1 less than 50<sup>th</sup> percentile of the sample, (2) V3 greater than 50<sup>th</sup> percentile of the sample, and lastly (3) V11 more than 50<sup>th</sup> percentile of the sample. The recovered estimated effect size is `0.9`, and the estimated prevalence of this microbial clique is almost `19%`. 
+The `V1:Threshold`, `V3:Threshold`, and `V11:Threshold` denote the estimated thresholds for `V1`, `V3`, and `V11`, respectively. Therefore, this exposure combination is formed in those having (1) `V1` less than 60<sup>th</sup> percentile of the sample, (2) `V3` greater than 40<sup>th</sup> percentile of the sample, and lastly (3) `V11` more than 40<sup>th</sup> percentile of the sample. The recovered estimated effect size of this three-ordered interaction is `0.9`, and the estimated prevalence of this exposure combination is almost `19%`. 
 
 
 
