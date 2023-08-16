@@ -10,5 +10,5 @@ As noted in Midya et al.<sup>1</sup>, this combination of exposure mixture algor
 
 ## Reference
 
-
+1. Midya, V., Alcala, C. S., Rechtman, E., Hertz-Picciotto, I., Gennings, C., Rosa, M., & Valvi, D. (2023). Machine learning assisted discovery of synergistic interactions between environmental pesticides, phthalates, phenols, and trace elements in child neurodevelopment. medRxiv, 2023-02.
 2. Basu, S.; Kumbier, K.; Brown, J. B.; Yu, B. Iterative Random Forests to Discover Predictive and Stable High-Order Interactions. Proc. Natl. Acad. Sci. 2018, 115 (8), 1943–1948.
