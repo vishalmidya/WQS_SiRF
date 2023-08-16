@@ -7,7 +7,7 @@ Assuming the main chemical mixture effect and the interactions are additive; we 
 
 As noted in Midya et al.<sup>1</sup>, this combination of exposure mixture algorithms can search for multi-ordered and non-linear interactions even when the number of chemical exposures is large. Further, since these interactions are based on thresholds, i.e., these interactions mimic the classical toxicological paradigm in which an interaction occurs only if the concentrations of certain chemicals are above some threshold. 
 
-The following illustration included both the WQS and Quantile g-computation in conjunction with the rh-SiRF algorithm to find a three-ordered non-linear interaction. 
+The following illustration included both the _Weighted Quantile Sum regression (WQS) regression_ and _Quantile g-computation_ models in conjunction with the rh-SiRF algorithm to find a three-ordered non-linear interaction. 
 
 ##  Simulated exposure data
 
