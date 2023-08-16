@@ -383,9 +383,7 @@ I'm sharing below the final output from the simulated example.
  <=60th Percentile >=40th Percentile >=40th Percentile          0.188   0.8719229 0.03281273 1.558698e-97
 ```
 
-The `V1:Threshold`, `V3:Threshold`, and `V11:Threshold` denote the estimated thresholds for `V1`, `V3`, and `V11`, respectively. Therefore, this exposure combination is formed in those having (1) `V1` less than 60<sup>th</sup> percentile of the sample, (2) `V3` greater than 40<sup>th</sup> percentile of the sample, and lastly (3) `V11` more than 40<sup>th</sup> percentile of the sample. The recovered estimated effect size of this three-ordered interaction is `0.9`, and the estimated prevalence of this exposure combination is almost `19%`. 
-
-
+The `V1:Threshold`, `V3:Threshold`, and `V11:Threshold` denote the estimated thresholds for `V1`, `V3`, and `V11`, respectively. Therefore, this exposure combination is formed in those having (1) `V1` less than 60<sup>th</sup> percentile of the sample, (2) `V3` greater than 40<sup>th</sup> percentile of the sample, and lastly (3) `V11` more than 40<sup>th</sup> percentile of the sample. The recovered estimated effect size of this three-ordered interaction is `0.9`, and the estimated prevalence of this exposure combination is almost `19%`.  Note that, a similar result is obtained if one chooses to use the _Quantile g-computation_ on this simulated dataset, instead of the _Weighted Quantile Sum regression (WQS) regression_. This is the case since, in the simulation, all five of the exposures were positively associated with the outcome. Therefore, in the absence of any other effect, the overall mixture effect from Quantile g-computation is similar to the joint mixture effect in the positive direction. 
 
 ### References:
 
@@ -394,4 +392,10 @@ The `V1:Threshold`, `V3:Threshold`, and `V11:Threshold` denote the estimated thr
 3. Tanner, E. M.; Bornehag, C.-G.; Gennings, C. Repeated holdout validation for weighted quantile sum regression. MethodsX. 2019, 6, 2855−2860.
 4. Curtin, P.; Kellogg, J.; Cech, N.; Gennings, C. A random subset implementation of weighted quantile sum (WQSRS) regression for analysis of high-dimensional mixtures. Communications in Statistics - Simulation and Computation. 2021, 50, 1119−1134.
 
+### Acknowledgments
 
+This method was developed at the Dept. of Environmental Medicine and Public Health, Icahn School of Medicine at Mount Sinai, NYC, with funding and support from the National Institute of Environmental Health Sciences (P30ES023515, and U2C ES026555-01).
+
+### Contact
+
+Please email Vishal Midya (vishal.midya@mssm.edu) for reporting typos, general questions, and feedback.  
