@@ -7,11 +7,11 @@ Assuming the main chemical mixture effect and the interactions are additive; we 
 
 As noted in Midya et al.<sup>1</sup>, this combination of exposure mixture algorithms can search for multi-ordered and non-linear interactions even when the number of chemical exposures is large. Further, since these interactions are based on thresholds, i.e., these interactions mimic the classical toxicological paradigm in which an interaction occurs only if the concentrations of certain chemicals are above some threshold. 
 
-The following illustration included both the _Weighted Quantile Sum regression (WQS) regression_ and _Quantile g-computation_ models in conjunction with the rh-SiRF algorithm to find a three-ordered non-linear interaction. 
+The following illustration included the _Weighted Quantile Sum regression (WQS) regression_ in conjunction with the rh-SiRF algorithm to find a three-ordered non-linear interaction. However, one can replace the WQS model with the _Quantile g-computation_ model, but caution should be practiced while interpreting the result (more details later). 
 
 ##  Simulated exposure data
 
-We first present simulated data on around `500` hypothetical participants with `60` simulated V The dataset, named `data.simulated.csv`, is uploaded as a part of the demonstration.
+We first present simulated data on around `500` hypothetical participants with `25` simulated exposures. The dataset, named `data.simulated.csv`, is uploaded as a part of the demonstration.
 
 ## Required `R` packages
 
@@ -271,15 +271,127 @@ Here is the result of the top 10 combinations obtained from the simulated datase
        V25_V3  2.3931
         V1_V7  2.3825
 ```
-The first column, `Var1`, denotes all possible combinations picked up by the algorithm, and the `Freq` denotes the percentage of their occurrence over all possible detected combinations and all bootstrap and repeated holdout combinations. The total number of detected unique combinations is around `80`. Note the top three combinations, `V11/V3`, `V1/V11`, and `V1/V3`, occurred the most (more than 10%) among all possible detected combinations. Moreover, a three-ordered `V1/V11/V3` combination was among the most occurring. The three-ordered combination of `V1/V11/V3` induced a downstream of further two-ordered combinations. With smaller sample sizes, this tool effectively detects lower-ordered combinations. However, as the sample size increases, the frequency of the true higher-ordered combinations also increases. Although this is very subjective, a good practice is to choose the top (first three or first five) most frequently occurring combinations as long as they form a clique.  Although we found the exposure combination, how it is associated with the outcome or the directionality is unknown. In the next stage, we estimate the thresholds of the exposures and its association with the outcome. 
+The first column, `Var1`, denotes all possible combinations picked up by the algorithm, and the `Freq` denotes the percentage of their occurrence over all possible detected combinations and all bootstrap and repeated holdout combinations. The total number of detected unique combinations is around `80`. Note the top three combinations, `V11/V3`, `V1/V11`, and `V1/V3`, occurred the most (more than 10%) among all possible detected combinations. Moreover, a three-ordered `V1/V11/V3` combination was among the most occurring. The three-ordered combination of `V1/V11/V3` induced a downstream of further two-ordered combinations. With smaller sample sizes, this tool effectively detects lower-ordered combinations. However, as the sample size increases, the frequency of the true higher-ordered combinations also increases. Although this is very subjective, a good practice is to choose the top (first three or first five) most frequently occurring combinations as long as they form a clique.  Although we found the exposure combination, how it is associated with the outcome or the directionality is unknown. In the next stage, we estimate the thresholds of the exposures and their joint association with the outcome. 
+
+## Estimating the thresholds of the microbial clique and its association with the outcome
+
+Run the following function that finds the thresholds for relative abundances of `V1`, `V3`, and `V11`. Each Taxa's directionality is chosen based on its univariate association. The following code _should only be used_ based on the output from the `clique.finder` function; otherwise, overfitting is possible. 
+
+```{}
+
+clique.tba <- function(clique.names, outcome, grid.quantile, min.prevalence,  data, family){
+  len <- length(clique.names)
+  if(len < 2){
+    stop("Need at least two exposures to form a meaningful clique") 
+  }
+  n <- dim(data)[1]
+  if(n == 0){
+    stop("Please provide a dataset in data.frame format") 
+  }
+  beta.data <- data.frame(Exposure = rep(NA_character_, len), effect_size = rep(NA_real_, len))
+  beta.data$Exposure <- clique.names
+  for(i in 1:len){
+    g.out <- data[,outcome]
+    if(family == "gaussian"){
+      fit <- summary(lm(g.out ~ as.matrix(data[, c(beta.data$Exposure[i])]), data = data))  
+    }
+    if(family == "binomial"){
+      fit <- summary(glm(g.out ~ as.matrix(data[, c(beta.data$Exposure[i])]), data = data , family = family))  
+    }
+    if(family == "poisson"){
+      fit <- summary(glm(g.out ~ as.matrix(data[, c(beta.data$Exposure[i])]), data = data , family = family))  
+    }
+    beta.data$effect_size[i] <- fit$coefficients[2,1]
+  }
+  x <- grid.quantile
+  if(length(grid.quantile) == 1){
+    stop("Please increase the number of possible thresholds")
+  }
+  if(sum(grid.quantile >= 1) != 0){
+    stop("All the values provided must be less than 1")
+  }
+  if(sum(grid.quantile <= 0) != 0){
+    stop("All the values provided must be more than 0")
+  }
+  d1 <- do.call(expand.grid, replicate(len, x, simplify = F))
+  d1$min.prevalence <- rep(NA_real_, dim(d1)[1])
+  d1$effect_size <- rep(NA_real_, dim(d1)[1])
+  d1$se <- rep(NA_real_, dim(d1)[1])
+  d1$pvalue <- rep(NA_real_, dim(d1)[1])
+  for(i in 1:nrow(d1)){
+    mat.len <- as.data.frame(matrix(NA_real_, ncol = len, nrow = nrow(data)))
+    for(j in 1:len){
+      if(sign(beta.data$effect_size)[j] < 0){
+        mat.len[,j] <- as.numeric(data[,clique.names[j]] <= quantile(data[,clique.names[j]], d1[i,j] )) 
+      }else{
+        mat.len[,j] <- as.numeric(data[,clique.names[j]] >= quantile(data[,clique.names[j]], d1[i,j] ))
+      }
+    }
+    clique.int <- apply(mat.len, 1, function(x){prod(x)})
+    
+    if(sum(clique.int)!= 0){
+      
+      d1$min.prevalence[i] <- as.numeric(table(clique.int)/sum(table(clique.int)))[2]
+      
+      if(d1$min.prevalence[i] >= min.prevalence){
+        
+        data$clique.int <- clique.int
+        g.out <- data[,outcome]
+        s <- summary(lm(g.out ~ as.matrix(data[, c("clique.int")]), data = data))
+        d1$effect_size[i] = s$coefficients[2,1]
+        d1$se[i] = s$coefficients[2,2]
+        d1$pvalue[i] = s$coefficients[2,4]
+      }
+    }
+  }
+  d2 <- na.omit(d1)
+  if(dim(d2)[1] == 0){
+    stop("Please decrease the min.prevalence, but keep it more than 5% for reliability")
+  }
+  d2 <- d2[d2$min.prevalence > 0.1,]
+  d2 <- d2[order(abs(d2$effect_size), decreasing = T),]
+  out <- d2[1,]
+  
+  cuts <-colnames(out)[!(colnames(out) %in% c("min.prevalence", "effect_size", "se",  "pvalue" ))]
+  colnames(out)[1:length(cuts)] <- paste0(clique.names, ":Threshold")
+  for(i in 1:nrow(beta.data)){
+    if(beta.data[i,"effect_size"] < 0){
+      out[,i] <- paste0("<=", out[,i]*100,"th Percentile")
+    } else {out[,i] <- paste0(">=", out[,i]*100,"th Percentile")}
+  }
+  return(out)
+}
+
+```
+Finally, run the `function` called `clique.tba`. Below we discuss each argument for this function and what they entail.
+
+```{}
+clique.tba(clique.names = c("V1", "V3", "V11"), outcome= "wqs.residuals", 
+           grid.quantile = seq(0.2, 0.8, 0.1), min.prevalence = 0.1, family = "gaussian", data = data.simulated)
+```
+1. `clique.names`: a vector containing the names of most frequently occurring Taxa that form a "clique". We chose `V1`, `V3`, and `V11` based on the output from `clique.finder`.
+2. `outcome`: name of the outcome variable
+3. `covariates`: a vector containing the names of the covariates
+4. `grid.quantile`: choices of the quantiles to search for the thresholds. We removed the lower and upper 20<sup>th</sup> quantiles for stable results. 
+5. `min.prevalence`: the minimum proportion (lower bound) of the sample that has the clique. Here we chose `10%` as the lower bound of the prevalence. 
+6. `family`: choice of `glm` family of distributions
+7. `data`: name of the dataset
+
+I'm sharing below the final output from the simulated example.
+
+```{}
+      V1:Threshold      V3:Threshold     V11:Threshold min.prevalence effect_size         se       pvalue
+ <=60th Percentile >=40th Percentile >=40th Percentile          0.188   0.8719229 0.03281273 1.558698e-97
+```
+
+The `V1:Threshold`, `V3:Threshold`, and `V11:Threshold` denote the estimated thresholds for `V1`, `V3`, and `V11`, respectively. Therefore, this microbial clique is formed in those having (1) V1 less than 50<sup>th</sup> percentile of the sample, (2) V3 greater than 50<sup>th</sup> percentile of the sample, and lastly (3) V11 more than 50<sup>th</sup> percentile of the sample. The recovered estimated effect size is `0.9`, and the estimated prevalence of this microbial clique is almost `19%`. 
 
 
 
+### References:
 
-References:
-
-1. ff
-2. ff
+1. Midya, V., Alcala, C. S., Rechtman, E., Hertz-Picciotto, I., Gennings, C., Rosa, M., & Valvi, D. (2023). Machine learning assisted discovery of synergistic interactions between environmental pesticides, phthalates, phenols, and trace elements in child neurodevelopment. medRxiv, 2023-02.
+2. Basu, S.; Kumbier, K.; Brown, J. B.; Yu, B. Iterative Random Forests to Discover Predictive and Stable High-Order Interactions. Proc. Natl. Acad. Sci. 2018, 115 (8), 1943–1948.
 3. Tanner, E. M.; Bornehag, C.-G.; Gennings, C. Repeated holdout validation for weighted quantile sum regression. MethodsX. 2019, 6, 2855−2860.
 4. Curtin, P.; Kellogg, J.; Cech, N.; Gennings, C. A random subset implementation of weighted quantile sum (WQSRS) regression for analysis of high-dimensional mixtures. Communications in Statistics - Simulation and Computation. 2021, 50, 1119−1134.
 
