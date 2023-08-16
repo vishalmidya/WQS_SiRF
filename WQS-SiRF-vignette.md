@@ -17,6 +17,8 @@ We first present simulated data on around `500` hypothetical participants with `
 
 Kindly install the following `R` packages
 1. `mvtnorm`
-2. `iRF`
+2. `gWQS`
+3. `iRF`
 
 Find the instructions [here](https://github.com/sumbose/iRF/tree/master) to install the `iRF` package.
+See details on how to use the gWQS model [here](https://cran.r-project.org/web/packages/gWQS/vignettes/gwqs-vignette.html).
