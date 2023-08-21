@@ -387,7 +387,7 @@ The `V1:Threshold`, `V3:Threshold`, and `V11:Threshold` denote the estimated thr
 
 ### References:
 
-1. Midya, V., Alcala, C. S., Rechtman, E., Hertz-Picciotto, I., Gennings, C., Rosa, M., & Valvi, D. (2023). Machine learning assisted discovery of synergistic interactions between environmental pesticides, phthalates, phenols, and trace elements in child neurodevelopment. medRxiv, 2023-02.
+1. Midya, V., Alcala, C. S., Rechtman, E., Gregory, J. K., Kannan, K., Hertz-Picciotto, I., ... & Valvi, D. (2023). Machine Learning Assisted Discovery of Interactions between Pesticides, Phthalates, Phenols, and Trace Elements in Child Neurodevelopment. Environmental Science & Technology.
 2. Basu, S.; Kumbier, K.; Brown, J. B.; Yu, B. Iterative Random Forests to Discover Predictive and Stable High-Order Interactions. Proc. Natl. Acad. Sci. 2018, 115 (8), 1943–1948.
 3. Tanner, E. M.; Bornehag, C.-G.; Gennings, C. Repeated holdout validation for weighted quantile sum regression. MethodsX. 2019, 6, 2855−2860.
 4. Curtin, P.; Kellogg, J.; Cech, N.; Gennings, C. A random subset implementation of weighted quantile sum (WQSRS) regression for analysis of high-dimensional mixtures. Communications in Statistics - Simulation and Computation. 2021, 50, 1119−1134.
