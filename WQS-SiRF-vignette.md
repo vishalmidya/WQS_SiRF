@@ -393,6 +393,10 @@ I'm sharing below the final output from the simulated example.
 
 The `V1:Threshold`, `V3:Threshold`, and `V11:Threshold` denote the estimated thresholds for `V1`, `V3`, and `V11`, respectively. Therefore, this exposure combination is formed in those having (1) `V1` less than 60<sup>th</sup> percentile of the sample, (2) `V3` greater than 40<sup>th</sup> percentile of the sample, and lastly (3) `V11` more than 40<sup>th</sup> percentile of the sample. The recovered estimated effect size of this three-ordered interaction is `0.9`, and the estimated prevalence of this exposure combination is almost `19%`.  Note that, a similar result is obtained if one chooses to use the _Quantile g-computation_ on this simulated dataset, instead of the _Weighted Quantile Sum regression (WQS) regression_. This is the case since, in the simulation, all five of the exposures were positively associated with the outcome. Therefore, in the absence of any other effect, the overall mixture effect from Quantile g-computation is similar to the joint mixture effect in the positive direction.
 
+### Note 
+
+1. This example does not partition the dataset into `training` and `testing` sets. However, given a larger sample, it is highly recommended to use this algorithm to discover interactions in the `training` set and then test it on the `testing` set.
+
 ### References:
 
 1. Midya, V., Alcala, C. S., Rechtman, E., Gregory, J. K., Kannan, K., Hertz-Picciotto, I., ... & Valvi, D. (2023). Machine Learning Assisted Discovery of Interactions between Pesticides, Phthalates, Phenols, and Trace Elements in Child Neurodevelopment. Environmental Science & Technology.
