@@ -100,7 +100,7 @@ This outcome is already supplied in the dataset. However, note that the effect s
 
 ## The aim of this algorithm
 
-1. To recover the mixture effect (joint mixture effect in apriori selected direction - WQS or overall mixture effect - qgcomputation)
+1. To recover the mixture effect (joint mixture effect in apriori hypothesized direction - WQS or overall mixture effect - qgcomputation)
 2. To recover the 3<sup>rd</sup> order interaction of `V1`, `V3`, and `V11`.
 3. To recover the thresholds for the construction of the interaction.
 4. To estimate the effect of the interaction on the outcome.
