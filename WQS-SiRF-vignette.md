@@ -179,10 +179,10 @@ clique.finder <- function(exposures, outcome, iterations, validation, seed.value
     set.seed(runif(1, 0, (seed.value + 10)))
     train.id <- sample(seq(1,n), ceiling(n*train.sample))
     test.id <- setdiff(1:n, train.id)
-    fit <- iRF(x=data.simulated[train.id, exposures], 
-               y=data.simulated[train.id,outcome], 
-               xtest=data.simulated[test.id, exposures],
-               ytest=data.simulated[test.id,outcome],
+    fit <- iRF(x=data[train.id, exposures], 
+               y=data[train.id,outcome], 
+               xtest=data[test.id, exposures],
+               ytest=data[test.id,outcome],
                n.iter=10, 
                n.core=3,
                select.iter = T,
