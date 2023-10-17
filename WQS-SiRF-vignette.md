@@ -281,6 +281,7 @@ Run the following function that finds the thresholds for the exposures `V1`, `V3
 ```{}
 
 clique.tba <- function(clique.names, outcome, grid.quantile, min.prevalence,  data, family){
+  data <- as.data.frame(data)
   len <- length(clique.names)
   if(len < 2){
     stop("Need at least two exposures to form a meaningful clique") 
