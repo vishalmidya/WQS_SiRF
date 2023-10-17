@@ -393,7 +393,19 @@ I'm sharing below the final output from the simulated example.
  <=60th Percentile >=40th Percentile >=40th Percentile          0.188   0.8719229 0.03281273 1.558698e-97
 ```
 
-The `V1:Threshold`, `V3:Threshold`, and `V11:Threshold` denote the estimated thresholds for `V1`, `V3`, and `V11`, respectively. Therefore, this exposure combination is formed in those having (1) `V1` less than 60<sup>th</sup> percentile of the sample, (2) `V3` greater than 40<sup>th</sup> percentile of the sample, and lastly (3) `V11` more than 40<sup>th</sup> percentile of the sample. The recovered estimated effect size of this three-ordered interaction is `0.9`, and the estimated prevalence of this exposure combination is almost `19%`.  Note that, a similar result is obtained if one chooses to use the _Quantile g-computation_ on this simulated dataset, instead of the _Weighted Quantile Sum regression (WQS) regression_. This is the case since, in the simulation, all five of the exposures were positively associated with the outcome. Therefore, in the absence of any other effect, the overall mixture effect from Quantile g-computation is similar to the joint mixture effect in the positive direction.
+The `V1:Threshold`, `V3:Threshold`, and `V11:Threshold` denote the estimated thresholds for `V1`, `V3`, and `V11`, respectively. Therefore, this clique is formed when (1) `V1` less than 60<sup>th</sup> percentile of the sample, (2) `V3` greater than 40<sup>th</sup> percentile of the sample, and lastly (3) `V11` more than 40<sup>th</sup> percentile of the sample. The recovered estimated effect size of this three-ordered interaction is `0.9`, and the estimated prevalence of this exposure combination is almost `19%`.  Note that, a similar result is obtained if one chooses to use the _Quantile g-computation_ on this simulated dataset, instead of the _Weighted Quantile Sum regression (WQS) regression_. This is the case since, in the simulation, all five of the exposures were positively associated with the outcome. Therefore, in the absence of any other effect, the overall mixture effect from Quantile g-computation is similar to the joint mixture effect in the positive direction.
+
+## Form the clique (as an indicator) and extract the association estimate 
+
+Finally, this clique can be used in conjunction with the mixture index and covariates to estimate the association with the outcome.
+
+```{}
+data.simulated$clique <- as.numeric(data.simulated$V1 <= quantile(data.simulated$V1, 0.6)
+                                    & data.simulated$V2 >= quantile(data.simulated$V2, 0.4)
+                                    & data.simulated$V3 >= quantile(data.simulated$V3, 0.4)
+)
+model <- lm(outcome ~ clique + wqs + cov1 + cov2 + cov3 + cov4, data = data.simulated)
+```
 
 ### Note 
 
