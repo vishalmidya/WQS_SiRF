@@ -155,6 +155,7 @@ Copy this code chunk below and run it.
 ```{}
 require("iRF")
 clique.finder <- function(exposures, outcome, iterations, validation, seed.value, n.bootstrap, min.prevalence, min.stability, data){
+  data <- as.data.frame(data)
   n <- dim(data)[1]
   if(n == 0){
     stop("Provide a dataset in data.frame format") 
