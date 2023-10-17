@@ -75,7 +75,7 @@ covariates <- make.X0(n,0.1,4)
 ```
 The set of four covariates is already supplied in the dataset.  
 
-3. __Create a 3<sup>rd</sup> ordered non-linear interaction__
+3. __Create a 3<sup>rd</sup> ordered non-linear interaction (as an example)__
 
 Without loss of generality, we choose 
   - `V1`, `V5`, `V10`, `V15`, and `V25` to form a positive mixture effect associated with the outcome.
