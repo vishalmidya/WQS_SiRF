@@ -407,9 +407,12 @@ data.simulated$clique <- as.numeric(data.simulated$V1 <= quantile(data.simulated
 model <- lm(outcome ~ clique + wqs + cov1 + cov2 + cov3 + cov4, data = data.simulated)
 ```
 
-### Note 
+## Important Notes
 
 1. This example does not partition the dataset into `training` and `testing` sets. However, given a larger sample, it is highly recommended to use this algorithm to discover interactions in the `training` set and then test it on the `testing` set.
+   
+2. With great power comes great responsibility; therefore, please be mindful of how many combinations to choose, which will eventually be converted to cliques. In an ideal scenario, choose the top combinations (say, top 5% or 10%) from the `training dataset,` and create the cliques using the `clique.tba` in the `test dataset`. However, in most scenarios, the dataset is relatively small; therefore, there is limited opportunity for dividing the dataset into training and testing. If the entire dataset is used, then one should declare the cutoff for choosing the top combinations and justify it. 
+
 
 ### References:
 
