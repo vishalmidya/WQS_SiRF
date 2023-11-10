@@ -279,7 +279,6 @@ The first column, `Var1`, denotes all possible combinations picked up by the alg
 Run the following function that finds the thresholds for the exposures `V1`, `V3`, and `V11`. Each exposure's directionality is chosen based on its univariate association with the outcome. The following code _should only be used_ based on the output from the `clique.finder` function; otherwise, overfitting is possible. 
 
 ```{}
-
 clique.tba <- function(clique.names, outcome, grid.quantile, min.prevalence,  data, family){
   data <- as.data.frame(data)
   len <- length(clique.names)
@@ -293,10 +292,10 @@ clique.tba <- function(clique.names, outcome, grid.quantile, min.prevalence,  da
   beta.data <- data.frame(Exposure = rep(NA_character_, len), boot_effect_size = rep(NA_real_, len))
   beta.data$Exposure <- clique.names
   for(i in 1:len){
-    boot.mean <- NA_real_; bootsize = 200;
+    boot.mean <- NA_real_; bootsize = 100;
     for(j in 1:bootsize){
       set.seed(runif(1,0,1e5))
-      boot.data <- data[sample(1:nrow(data), 500 , replace = T),]
+      boot.data <- data[sample(1:nrow(data), replace = T),]
       g.out <- boot.data[,outcome]
       if(family == "gaussian"){
         fit <- summary(lm(g.out ~ as.matrix(boot.data[, c(beta.data$Exposure[i])]), data = boot.data))  
@@ -339,7 +338,7 @@ clique.tba <- function(clique.names, outcome, grid.quantile, min.prevalence,  da
     }
     clique.int <- apply(mat.len, 1, function(x){prod(x)})
     
-    if(sum(clique.int)!= 0){
+    if(sum(clique.int)!= 0 & sum(clique.int)!= dim(data)[1]){
       
       d1$min.prevalence[i] <- as.numeric(table(clique.int)/sum(table(clique.int)))[2]
       
